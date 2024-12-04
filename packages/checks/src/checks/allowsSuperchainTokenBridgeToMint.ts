@@ -52,7 +52,7 @@ export const allowsSuperchainTokenBridgeToMint = async (
   if (callResult.error) {
     return {
       success: false,
-      reason: `Token does not allow SuperchainTokenBridge to mint: ${callResult.error.message}`,
+      reason: `Token does not allow SuperchainTokenBridge to mint: ${callResult.error}`,
     }
   }
 

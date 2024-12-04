@@ -6,6 +6,8 @@ import {
   emitsCrosschainMintEvent,
   CheckResult,
   checkIsContractDeployed,
+  allowsSuperchainTokenBridgeToBurn,
+  emitsCrosschainBurnEvent,
 } from '@superchainerc20-compatibility/checks'
 import { Providers } from '@/Providers'
 import {
@@ -41,8 +43,12 @@ import {
 } from '@/components/ui/select'
 import { useAllChainsByNetwork } from '@/config/queryAllChains'
 import { useNavigate, useSearchParams, createSearchParams } from 'react-router'
-
-const address = '0xAaA2b0D6295b91505500B7630e9E36a461ceAd1b' as const
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import { ChevronUp, Pencil } from 'lucide-react'
 
 const checkQueriesForChain = (chain: Chain, address: Address) => [
   {
@@ -86,6 +92,29 @@ const checkQueriesForChain = (chain: Chain, address: Address) => [
       chainId: chain.id,
       title: 'Token emits correct CrosschainMint event',
       description: 'Token emits correct CrosschainMint event',
+    },
+  },
+  {
+    queryKey: ['bridge-burning', chain.id, address],
+    queryFn: async () => {
+      return allowsSuperchainTokenBridgeToBurn({ chain }, address)
+    },
+    meta: {
+      queryKey: ['bridge-burning', chain.id, address],
+      chainId: chain.id,
+      title: 'SuperchainTokenBridge can burn',
+      description: 'SuperchainTokenBridge can burn',
+    },
+  },
+
+  {
+    queryKey: ['crosschain-burn-event', chain.id, address],
+    queryFn: () => emitsCrosschainBurnEvent({ chain }, address),
+    meta: {
+      queryKey: ['crosschain-burn-event', chain.id, address],
+      chainId: chain.id,
+      title: 'Token emits correct CrosschainBurn event',
+      description: 'Token emits correct CrosschainBurn event',
     },
   },
 ]
@@ -348,9 +377,7 @@ const Inner = () => {
   const [selectedChainIds, setSelectedChainIds] = useState<number[]>(
     chainIds || [],
   )
-
-  const [addressToCheck, setAddressToCheck] = useState<Address | null>(null)
-  const [chainsToCheck, setChainsToCheck] = useState<Chain[]>([])
+  const [isOpen, setIsOpen] = useState(!urlAddress)
 
   const handleAddressSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -361,7 +388,6 @@ const Inner = () => {
 
     const result = zodAddress.safeParse(address)
     if (result.success) {
-      setAddressToCheck(result.data)
       setError(null)
 
       navigate({
@@ -392,116 +418,139 @@ const Inner = () => {
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         <Card>
-          <CardHeader>
-            <CardTitle>SuperchainERC20 Checker</CardTitle>
-            <CardDescription>
-              Verify if your ERC20 token implementation is compatible with the
-              Superchain bridge
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <label className="text-sm font-medium">Select Network</label>
-                <Select
-                  value={selectedNetwork}
-                  onValueChange={(value) => {
-                    setSelectedNetwork(value)
-                    setSelectedChainIds([])
-                    setChainsToCheck([])
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a network" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {chainsByNetwork &&
-                      Object.keys(chainsByNetwork).map((network) => (
-                        <SelectItem key={network} value={network}>
-                          {network.charAt(0).toUpperCase() + network.slice(1)}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+            <CollapsibleTrigger asChild className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-6 px-6 hover:bg-slate-50 transition-colors cursor-pointer rounded-xl">
+                <div className="space-y-1.5">
+                  <CardTitle>SuperchainERC20 Checker</CardTitle>
+                  <CardDescription>
+                    Verify if your ERC20 token implementation is compatible with
+                    the Superchain bridge
+                  </CardDescription>
+                </div>
+                {urlAddress && (
+                  <div className="shrink-0 ml-4 text-muted-foreground">
+                    {isOpen ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <Pencil className="h-4 w-4" />
+                    )}
+                  </div>
+                )}
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <CardContent className="px-6 pb-6">
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <label className="text-sm font-medium">
+                      Select Network
+                    </label>
+                    <Select
+                      value={selectedNetwork}
+                      onValueChange={(value) => {
+                        setSelectedNetwork(value)
+                        setSelectedChainIds([])
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a network" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {chainsByNetwork &&
+                          Object.keys(chainsByNetwork).map((network) => (
+                            <SelectItem key={network} value={network}>
+                              {network.charAt(0).toUpperCase() +
+                                network.slice(1)}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {selectedNetwork && chainsByNetwork && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-sm font-medium">Select Chains</label>
-                    <div className="space-x-2">
+                  {selectedNetwork && chainsByNetwork && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-sm font-medium">
+                          Select Chains
+                        </label>
+                        <div className="space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setSelectedChainIds(
+                                chainsByNetwork[selectedNetwork].map(
+                                  (chain) => chain.id,
+                                ),
+                              )
+                            }
+                          >
+                            Select All
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedChainIds([])}
+                          >
+                            Select None
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {chainsByNetwork[selectedNetwork].map((chain) => (
+                          <Button
+                            key={chain.id}
+                            variant={
+                              selectedChainIds.includes(chain.id)
+                                ? 'default'
+                                : 'outline'
+                            }
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setSelectedChainIds((prev) =>
+                                prev.includes(chain.id)
+                                  ? prev.filter((id) => id !== chain.id)
+                                  : [...prev, chain.id],
+                              )
+                            }}
+                          >
+                            <span className="truncate">{chain.name}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={handleAddressSubmit}
+                    className="flex flex-col gap-3"
+                  >
+                    <div className="flex gap-3">
+                      <Input
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Enter contract address"
+                        className="flex-grow"
+                      />
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setSelectedChainIds(
-                            chainsByNetwork[selectedNetwork].map(
-                              (chain) => chain.id,
-                            ),
-                          )
+                        type="submit"
+                        disabled={
+                          selectedChainIds.length === 0 || !hasParamsChanged()
                         }
                       >
-                        Select All
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedChainIds([])}
-                      >
-                        Select None
+                        Check
                       </Button>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {chainsByNetwork[selectedNetwork].map((chain) => (
-                      <Button
-                        key={chain.id}
-                        variant={
-                          selectedChainIds.includes(chain.id)
-                            ? 'default'
-                            : 'outline'
-                        }
-                        className="w-full justify-start"
-                        onClick={() => {
-                          setSelectedChainIds((prev) =>
-                            prev.includes(chain.id)
-                              ? prev.filter((id) => id !== chain.id)
-                              : [...prev, chain.id],
-                          )
-                        }}
-                      >
-                        <span className="truncate">{chain.name}</span>
-                      </Button>
-                    ))}
-                  </div>
+                    {error && (
+                      <p className="text-sm text-destructive">{error}</p>
+                    )}
+                  </form>
                 </div>
-              )}
-
-              <form
-                onSubmit={handleAddressSubmit}
-                className="flex flex-col gap-3"
-              >
-                <div className="flex gap-3">
-                  <Input
-                    type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Enter contract address"
-                    className="flex-grow"
-                  />
-                  <Button
-                    type="submit"
-                    disabled={
-                      selectedChainIds.length === 0 || !hasParamsChanged()
-                    }
-                  >
-                    Check
-                  </Button>
-                </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-              </form>
-            </div>
-          </CardContent>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
 
         <Checks />

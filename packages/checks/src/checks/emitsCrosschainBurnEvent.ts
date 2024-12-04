@@ -13,17 +13,17 @@ import { CheckResult } from '../check'
 import { createDebugClient } from '../trace-client/client'
 import { contracts } from '@eth-optimism/viem'
 
-const mintAmount = parseEther('1')
+const burnAmount = parseEther('0')
 // random vanity address
 const recipient = '0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF'
-const mintData = encodeFunctionData({
+const burnData = encodeFunctionData({
   abi: IERC7802Abi,
-  functionName: 'crosschainMint',
-  args: [recipient, mintAmount],
+  functionName: 'crosschainBurn',
+  args: [recipient, burnAmount],
 })
 const superchainTokenBridgeAddress = contracts.superchainTokenBridge.address
 
-export const emitsCrosschainMintEvent = async (
+export const emitsCrosschainBurnEvent = async (
   { chain, rpcUrlOverride }: PerChainContext,
   contractAddress: Address,
 ): Promise<CheckResult> => {
@@ -35,7 +35,7 @@ export const emitsCrosschainMintEvent = async (
   const callResult = await debugClient.traceCall({
     account: superchainTokenBridgeAddress,
     to: contractAddress,
-    data: mintData,
+    data: burnData,
     tracer: 'callTracer',
     tracerConfig: {
       withLog: true,
@@ -50,47 +50,47 @@ export const emitsCrosschainMintEvent = async (
   if (callResult.error) {
     return {
       success: false,
-      reason: `Token does not allow SuperchainTokenBridge to mint: ${callResult.error}`,
+      reason: `Token does not allow SuperchainTokenBridge to burn: ${callResult.error}`,
     }
   }
 
   if (callResult.logs === undefined || callResult.logs.length === 0) {
     return {
       success: false,
-      reason: 'Token does not emit any events during crosschainMint operation',
+      reason: 'Token does not emit any events during crosschainBurn operation',
     }
   }
 
-  const crosschainMintEvents = parseEventLogs({
+  const crosschainBurnEvents = parseEventLogs({
     abi: IERC7802Abi,
     logs: callResult.logs as unknown as RpcLog[],
-    eventName: 'CrosschainMint',
+    eventName: 'CrosschainBurn',
   })
 
-  if (crosschainMintEvents.length === 0) {
+  if (crosschainBurnEvents.length === 0) {
     return {
       success: false,
       reason:
-        'Token does not emit CrosschainMint event during crosschainMint operation',
+        'Token does not emit CrosschainBurn event during crosschainBurn operation',
     }
   }
 
-  const { to, amount, sender } = crosschainMintEvents[0].args
+  const { from, amount, sender } = crosschainBurnEvents[0].args
 
   if (
-    to !== recipient ||
-    amount !== mintAmount ||
+    from !== recipient ||
+    amount !== burnAmount ||
     sender !== superchainTokenBridgeAddress
   ) {
     return {
       success: false,
       reason:
-        'Token does not emit correct CrosschainMint event (to recipient with correct amount)',
+        'Token does not emit correct CrosschainBurn event (to recipient with correct amount)',
     }
   }
 
   return {
     success: true,
-    message: 'Token correctly emits CrosschainMint event during crosschainMint',
+    message: 'Token correctly emits CrosschainBurn event during crosschainBurn',
   }
 }
