@@ -5,6 +5,11 @@ export type CreateContextParams = {
   rpcUrlOverrideByChainId: Record<number, string>
 }
 
+export type PerChainContext = {
+  chain: Chain
+  rpcUrlOverride?: string
+}
+
 export const createContext = ({
   chains,
   rpcUrlOverrideByChainId,

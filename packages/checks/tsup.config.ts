@@ -2,11 +2,10 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  name: '@eth-optimism/message-queue',
+  name: '@superchainerc20-compatibility/checks',
   entry: ['src/index.ts'],
   outDir: 'build',
-  format: ['cjs'],
-  target: 'node18',
+  format: ['esm'],
   splitting: false,
   sourcemap: true,
   clean: true,
